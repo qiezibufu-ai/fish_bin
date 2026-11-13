@@ -1,0 +1,4 @@
+interface:
+  display_name: "嵌入式工程移植与开发规范"
+  short_description: "直接移植与开发嵌入式工程，统一分层命名、中文接口文档和可定位错误处理"
+  default_prompt: "使用 $embedded-architecture 将目标工程按统一分层、命名、中文Doxygen和错误状态机规则完成移植，后续修改继续遵循工程内规范。"

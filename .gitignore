@@ -1,0 +1,53 @@
+# ESP-IDF / CMake 构建产物
+/build/
+/build-*/
+/build_*/
+/cmake-build-*/
+/CMakeFiles/
+/CMakeCache.txt
+/compile_commands.json
+/managed_components/
+/*.elf
+/*.bin
+/*.map
+*.o
+*.obj
+*.a
+
+# 保留 sdkconfig 作为当前已验证的板级配置；仅忽略自动备份。
+# 如后续引入 idf_component.yml，dependencies.lock 应提交以固定依赖。
+/sdkconfig.old
+/sdkconfig.*.old
+
+# IDE 本机配置
+/.idea/
+/.vscode/
+*.iml
+*.code-workspace
+
+# 本地测试、临时文件和生成的交付物
+/work/
+/tmp/
+/outputs/
+*.log
+*.tmp
+*.swp
+*.swo
+*~
+
+# Python 工具缓存与本地虚拟环境
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# 本机环境和凭据；示例配置仍可提交
+.env
+.env.*
+!.env.example
+!.env.template
+
+# 操作系统元数据
+.DS_Store
+Thumbs.db
