@@ -1,5 +1,8 @@
 # 电机台架接线与验证
 
+本页记录电机台架。当前默认使用[液滴计数台架模式](drop_count_bringup.md)，
+要运行电机台架须先将 `APP_DROP_COUNT_TEST_ENABLE` 设为 0。
+
 ## 当前引脚
 
 | 用途 | ESP32-S3 | 外部连接 | 本期状态 |
@@ -8,7 +11,7 @@
 | 电机UART1 RX | GPIO16 | 自动收发模块TTL TX/RO | 已配置 |
 | 参考地 | GND | 模块参考地；485侧按隔离/非隔离模块说明连接 | 接线确认 |
 | DE/RE | 不使用 | 模块自动收发 | 不配置方向GPIO |
-| 液滴计数 | GPIO4 | QLT1616经电平适配后的信号 | GPIO输入，未挂计数ISR |
+| 液滴计数 | GPIO4 | QLT1616经电平适配后的信号 | 计数台架用PCNT采集 |
 | 气泡输入 | GPIO5候选 | OGR350经确认/适配后的逻辑A或B | 仅预留，不初始化 |
 
 引脚基于ESP32-S3可用IO选择，具体底板未给出完整型号，仍须核对17/16/4/5未接其他外设。UART0留作默认日志口；应用不初始化UART2，避免占用GPIO19/20的USB功能。[Espressif GPIO说明](https://docs.espressif.com/projects/esp-idf/en/v5.2.1/esp32s3/api-reference/peripherals/gpio.html)。

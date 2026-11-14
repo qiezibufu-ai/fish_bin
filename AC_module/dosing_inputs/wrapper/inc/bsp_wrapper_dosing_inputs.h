@@ -1,4 +1,4 @@
-/** @file bsp_wrapper_dosing_inputs.h @brief 滴定输入预留契约；无实现时必须报告未就绪。 */
+/** @file bsp_wrapper_dosing_inputs.h @brief 滴定输入快照契约；无实现时必须报告未就绪。 */
 #ifndef AC_MODULE_DOSING_INPUTS_WRAPPER_INC_BSP_WRAPPER_DOSING_INPUTS_H
 #define AC_MODULE_DOSING_INPUTS_WRAPPER_INC_BSP_WRAPPER_DOSING_INPUTS_H
 #include "fw_error.h"
@@ -14,11 +14,11 @@ typedef struct
 {
     bsp_dosing_liquid_state_t liquid; /**< 气泡传感器判定，默认UNKNOWN。 */
     bool liquid_valid;                /**< 气泡通道已标定且样本有效。 */
-    uint32_t drop_count;               /**< QLT1616累计液滴计数，允许32位回绕。 */
-    bool count_valid;                 /**< 计数通道已接入且计数窗口有效。 */
+    uint32_t drop_count;               /**< QLT1616累计有效脉冲数，单位滴；采集端约定范围。 */
+    bool count_valid;                 /**< 计数硬件快照有效；无法据此确认传感器在线。 */
     uint32_t timestamp_ms;             /**< 采样单调毫秒时间。 */
 } bsp_dosing_inputs_snapshot_t;
-/** @brief 后续滴定服务注入的输入端口；本期无提供者，read_snapshot为NULL。 */
+/** @brief 滴定输入端口；未绑定时read_snapshot为NULL。 */
 typedef struct
 {
     /**

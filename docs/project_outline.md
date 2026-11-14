@@ -3,6 +3,12 @@
 更新日期：2026-11-13。
 工程：`/home/crowiehuang/Project/ESP32Project/fish_bin`。
 
+2026-11-14：第二阶段已接入 GPIO4 的 PCNT 只读台架测试，接线及操作见
+[液滴计数台架说明](drop_count_bringup.md)。下文保留第一阶段实施范围。
+
+第三阶段：已接入 `AB_service/dosing`。清水联调流程与结果说明见
+[滴定服务台架](dosing_bringup.md)，默认保留计数模式。
+
 ## 已确认需求
 
 - ESP32-S3，ESP-IDF v6.1，FreeRTOS；保持现有SDK、sdkconfig与工程命名。

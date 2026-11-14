@@ -18,6 +18,30 @@ typedef uint32_t fw_error_t;
 /** @brief 操作成功，不代表异步动作已经完成。 */
 #define FW_OK UINT32_C(0)
 
+/* AB_service: 滴定服务 (0x0201)。 */
+/** @brief 请求参数无效。 */
+#define FW_ERR_DOSING_ARG UINT32_C(0x02010001)
+/** @brief 滴定服务未绑定。 */
+#define FW_ERR_DOSING_NOT_READY UINT32_C(0x02010002)
+/** @brief 已有滴定请求。 */
+#define FW_ERR_DOSING_BUSY UINT32_C(0x02010003)
+/** @brief 电机配置失败。 */
+#define FW_ERR_DOSING_SETUP UINT32_C(0x02010004)
+/** @brief 启动未确认。 */
+#define FW_ERR_DOSING_START UINT32_C(0x02010005)
+/** @brief 停车未确认。 */
+#define FW_ERR_DOSING_STOP UINT32_C(0x02010006)
+/** @brief 计数无效或回退。 */
+#define FW_ERR_DOSING_COUNT UINT32_C(0x02010007)
+/** @brief 无滴超时。 */
+#define FW_ERR_DOSING_NO_DROP UINT32_C(0x02010008)
+/** @brief 泵运行超时。 */
+#define FW_ERR_DOSING_RUN_TIMEOUT UINT32_C(0x02010009)
+/** @brief 尾滴观察超时。 */
+#define FW_ERR_DOSING_TAIL_TIMEOUT UINT32_C(0x0201000A)
+/** @brief 滴定阶段无效。 */
+#define FW_ERR_DOSING_STATE UINT32_C(0x0201000B)
+
 /* ==================== AD_platform: 通用总线端口 (0x0401) ==================== */
 /** @brief 平台总线01的事务超时。 */
 #define FW_ERR_PORT_TIMEOUT UINT32_C(0x04010001)
@@ -83,6 +107,16 @@ typedef uint32_t fw_error_t;
 #define FW_ERR_UART_RX_FAILED UINT32_C(0x04040008)
 /** @brief UART 端口进入未定义状态。 */
 #define FW_ERR_UART_INVALID_STATE UINT32_C(0x04040009)
+
+/* AD_platform: PCNT液滴采集端口 (0x0405)。 */
+/** @brief PCNT资源或采集配置初始化失败。 */
+#define FW_ERR_PCNT_INIT UINT32_C(0x04050001)
+/** @brief PCNT读取失败或累计值超出台架范围。 */
+#define FW_ERR_PCNT_READ UINT32_C(0x04050002)
+/** @brief PCNT资源释放失败。 */
+#define FW_ERR_PCNT_RELEASE UINT32_C(0x04050003)
+/** @brief PCNT端口内部生命周期状态未定义。 */
+#define FW_ERR_PCNT_INVALID_STATE UINT32_C(0x04050004)
 
 /* ==================== AE_common: 环形缓冲区 (0x0501) ======================== */
 /** @brief 环形缓冲区参数非法或容量为0。 */

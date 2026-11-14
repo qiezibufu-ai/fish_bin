@@ -31,11 +31,12 @@ typedef enum
     APP_STAGE_UART_INIT,     /**< 初始化板级 UART 端口阶段。 */
     APP_STAGE_TASK_REGISTER, /**< 统一注册应用任务阶段。 */
     APP_STAGE_VALIDATE,      /**< 内部状态机合法性校验阶段。 */
-    APP_STAGE_MOTOR_BIND     /**< 绑定电机驱动，不发送运动命令。 */
+    APP_STAGE_MOTOR_BIND,    /**< 绑定电机驱动，不发送运动命令。 */
+    APP_STAGE_DROP_COUNT_INIT /**< 初始化台架液滴计数端口。 */
 } app_stage_t;
 
 /**
- * @brief 初始化底层平台端口（GPIO、单路电机 UART 与协议绑定），不创建后台任务。
+ * @brief 初始化当前模式的GPIO、PCNT和/或电机UART并绑定能力，不创建后台任务。
  * @retval FW_OK 平台端口全部就绪，状态进入 APP_STATE_PLATFORM_READY。
  * @retval FW_ERR_APP_ALREADY_INIT 应用已完成初始化。
  * @retval FW_ERR_APP_PLATFORM_INIT_FAILED 某个平台端口初始化失败，底层源头保存在错误快照。
@@ -58,8 +59,9 @@ fw_error_t app_init(void);
 /**
  * @brief 反初始化应用层，停止基础任务并释放平台端口资源。
  * @retval FW_OK 反初始化成功，状态回到 APP_STATE_UNINITIALIZED。
- * @note 仅启动/维护上下文调用；调用方必须先在电机所有者任务内取消并确认停机，
- * 再停止该任务后调用本函数；不能与bootstrap事务并发，允许FAULT后显式恢复。
+ * @return 任务删除或平台释放失败时返回对应OSAL或端口错误。
+ * @note 仅启动/维护上下文调用；须先停止bootstrap的业务调用，电机模式下须在所有者
+ * 任务内取消并确认停机；不能与采样或电机事务并发，允许FAULT后显式恢复。
  */
 fw_error_t app_deinit(void);
 

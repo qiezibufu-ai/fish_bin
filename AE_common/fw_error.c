@@ -19,6 +19,19 @@ static const error_entry_t s_entries[] =
 {
     {FW_OK, "FW_OK", "操作成功"},
 
+    /* AB_service: 滴定服务 (0x0201) */
+    {FW_ERR_DOSING_ARG, "FW_ERR_DOSING_ARG", "请求参数无效"},
+    {FW_ERR_DOSING_NOT_READY, "FW_ERR_DOSING_NOT_READY", "滴定服务未绑定"},
+    {FW_ERR_DOSING_BUSY, "FW_ERR_DOSING_BUSY", "已有滴定请求"},
+    {FW_ERR_DOSING_SETUP, "FW_ERR_DOSING_SETUP", "电机配置失败"},
+    {FW_ERR_DOSING_START, "FW_ERR_DOSING_START", "启动未确认"},
+    {FW_ERR_DOSING_STOP, "FW_ERR_DOSING_STOP", "停车未确认"},
+    {FW_ERR_DOSING_COUNT, "FW_ERR_DOSING_COUNT", "计数无效或回退"},
+    {FW_ERR_DOSING_NO_DROP, "FW_ERR_DOSING_NO_DROP", "无滴超时"},
+    {FW_ERR_DOSING_RUN_TIMEOUT, "FW_ERR_DOSING_RUN_TIMEOUT", "泵运行超时"},
+    {FW_ERR_DOSING_TAIL_TIMEOUT, "FW_ERR_DOSING_TAIL_TIMEOUT", "尾滴观察超时"},
+    {FW_ERR_DOSING_STATE, "FW_ERR_DOSING_STATE", "滴定阶段无效"},
+
     /* AD_platform: 通用总线端口 (0x0401) */
     {FW_ERR_PORT_TIMEOUT, "FW_ERR_PORT_TIMEOUT", "平台总线事务超时"},
     {FW_ERR_PORT_BUSY, "FW_ERR_PORT_BUSY", "平台总线未接受事务"},
@@ -55,6 +68,12 @@ static const error_entry_t s_entries[] =
     {FW_ERR_UART_TX_FAILED, "FW_ERR_UART_TX_FAILED", "UART发送事务失败"},
     {FW_ERR_UART_RX_FAILED, "FW_ERR_UART_RX_FAILED", "UART接收事务失败"},
     {FW_ERR_UART_INVALID_STATE, "FW_ERR_UART_INVALID_STATE", "UART内部状态未定义"},
+
+    /* AD_platform: PCNT液滴采集端口 (0x0405) */
+    {FW_ERR_PCNT_INIT, "FW_ERR_PCNT_INIT", "PCNT初始化失败"},
+    {FW_ERR_PCNT_READ, "FW_ERR_PCNT_READ", "PCNT读取失败或累计值超出范围"},
+    {FW_ERR_PCNT_RELEASE, "FW_ERR_PCNT_RELEASE", "PCNT资源释放失败"},
+    {FW_ERR_PCNT_INVALID_STATE, "FW_ERR_PCNT_INVALID_STATE", "PCNT状态未定义"},
 
     /* AE_common: 环形缓冲区 (0x0501) */
     {FW_ERR_RINGBUF_INVALID_ARG, "FW_ERR_RINGBUF_INVALID_ARG", "环形缓冲区参数无效"},

@@ -5,6 +5,7 @@
 #include "app_main.h"
 #include "bsp_adapter_port_kamoer.h"
 #include "board_config.h"
+#include "motor_config.h"
 #include "fw_error.h"
 #include "gpio_port.h"
 #include "osal.h"
@@ -495,6 +496,11 @@ static void test_fw_error_and_ring_buffer(void)
         FW_ERR_UART_INVALID_ARG, FW_ERR_UART_NOT_READY, FW_ERR_UART_BUSY,
         FW_ERR_UART_TIMEOUT, FW_ERR_UART_CONFIG_FAILED, FW_ERR_UART_DRIVER_FAILED,
         FW_ERR_UART_TX_FAILED, FW_ERR_UART_RX_FAILED, FW_ERR_UART_INVALID_STATE,
+        FW_ERR_DOSING_ARG, FW_ERR_DOSING_NOT_READY, FW_ERR_DOSING_BUSY,
+        FW_ERR_DOSING_SETUP, FW_ERR_DOSING_START, FW_ERR_DOSING_STOP, FW_ERR_DOSING_COUNT,
+        FW_ERR_DOSING_NO_DROP, FW_ERR_DOSING_RUN_TIMEOUT, FW_ERR_DOSING_TAIL_TIMEOUT,
+        FW_ERR_DOSING_STATE,
+        FW_ERR_PCNT_INIT, FW_ERR_PCNT_READ, FW_ERR_PCNT_RELEASE, FW_ERR_PCNT_INVALID_STATE,
         FW_ERR_RINGBUF_INVALID_ARG, FW_ERR_RINGBUF_FULL, FW_ERR_RINGBUF_EMPTY,
         FW_ERR_SENSOR_INVALID_ARG, FW_ERR_SENSOR_NOT_READY, FW_ERR_SENSOR_BUSY,
         FW_ERR_SENSOR_ID_READ_FAILED, FW_ERR_SENSOR_ID_MISMATCH,
@@ -726,6 +732,7 @@ static void test_app_composition_root(void)
     s_host_uart_uninstall_err = ESP_OK;
     s_host_task_create_err = OSAL_OK;
 
+#if !APP_DROP_COUNT_TEST_ENABLE || APP_DOSING_TEST_ENABLE
     /* 注入底层 UART 安装错误，验证 AA_app 捕获本层位置并保留底层 origin 源头 */
     s_host_uart_install_err = -555;
     assert(app_init() == FW_ERR_APP_PLATFORM_INIT_FAILED);
@@ -743,14 +750,38 @@ static void test_app_composition_root(void)
     /* 显式反初始化后正常启动组合根 */
     s_host_uart_install_err = ESP_OK;
     assert(app_deinit() == FW_OK);
+#else
+    app_state_t ast = APP_STATE_UNINITIALIZED;
+    fw_error_record_t aerr = {0};
+    /* 计数台架不应尝试初始化电机UART。 */
+    s_host_uart_install_err = -555;
+    s_host_task_create_err = OSAL_ERR_NO_MEMORY;
+    assert(app_init() == FW_ERR_APP_TASK_CREATE_FAILED);
+    uint32_t count = 0U;
+    assert(core_pcnt_read(&count) == FW_ERR_PORT_NOT_READY);
+    assert(app_deinit() == FW_OK);
+    s_host_task_create_err = OSAL_OK;
+#endif
     assert(app_init() == FW_OK);
     assert(app_get_status(&ast, &aerr) == FW_OK && ast == APP_STATE_RUNNING);
     assert(app_init() == FW_ERR_APP_ALREADY_INIT);
+#if APP_DOSING_TEST_ENABLE
+    assert(s_uart_channels[CORE_UART_ID_1].driver_installed);
+    uint32_t count;
+    assert(core_pcnt_read(&count) == FW_OK && count == 0U);
+    assert(s_dosing.result.state == SERVICE_DOSING_IDLE);
+    assert(s_host_loopback_len[CORE_UART_ID_1] == 0U);
+#elif APP_DROP_COUNT_TEST_ENABLE
+    assert(!s_uart_channels[CORE_UART_ID_1].driver_installed);
+    assert(core_pcnt_read(&count) == FW_OK && count == 0U);
+    s_host_uart_install_err = ESP_OK;
+#else
     assert(s_uart_channels[CORE_UART_ID_1].config.mode == CORE_UART_MODE_NORMAL);
     assert(s_uart_channels[CORE_UART_ID_1].config.rts_de_pin == BOARD_GPIO_PIN_NC);
     assert(s_uart_channels[CORE_UART_ID_1].config.tx_buf_bytes == 0U);
     assert(!s_uart_channels[CORE_UART_ID_2].driver_installed);
     assert(s_motor_test.state == APP_MOTOR_IDLE && s_host_loopback_len[CORE_UART_ID_1] == 0U);
+#endif
     assert(app_deinit() == FW_OK);
     puts("PASS AA_app: composition root init, rollback cleanup and origin error propagation");
 }
@@ -828,7 +859,44 @@ static void test_motor_uart_adapter(void)
     puts("PASS motor UART adapter: fragmented frames, auto direction, total timeout across tick wrap");
 }
 
+#if APP_DOSING_TEST_ENABLE
+void test_drop_count_simulate_edge(bool rising);
+
+static void test_dosing_composition(void)
+{
+    assert(app_init() == FW_OK);
+    s_host_uart_tx_hook = simulate_motor_response;
+    s_host_delay_hook = release_fragment;
+    s_discard_response = false;
+    assert(app_dosing_submit());
+    for (unsigned i = 0U; i < 6U; ++i)
+    {
+        assert(app_dosing_advance());
+    }
+    assert(s_dosing.result.state == SERVICE_DOSING_RUNNING);
+    for (uint32_t i = 0U; i < APP_DOSING_TEST_TARGET_DROPS; ++i)
+    {
+        test_drop_count_simulate_edge(false);
+        test_drop_count_simulate_edge(true);
+    }
+    assert(app_dosing_advance() && s_dosing.result.state == SERVICE_DOSING_TAIL);
+    assert(s_dosing.result.stop_acked);
+    assert(s_dosing.result.stop_drops == APP_DOSING_TEST_TARGET_DROPS);
+    test_drop_count_simulate_edge(false);
+    assert(app_dosing_advance());
+    s_host_tick += APP_DOSING_TEST_TAIL_QUIET_MS;
+    assert(!app_dosing_advance() && s_dosing.result.state == SERVICE_DOSING_DONE);
+    assert(s_dosing.result.drops == APP_DOSING_TEST_TARGET_DROPS + 1U);
+    s_host_uart_tx_hook = NULL;
+    s_host_delay_hook = NULL;
+    assert(app_deinit() == FW_OK);
+    puts("PASS dosing composition: application, PCNT snapshots and Kamoer UART frames");
+}
+#endif
+
 void test_motor_apis(void);
+void test_drop_count(void);
+void test_service_dosing(void);
 
 int main(void)
 {
@@ -836,7 +904,12 @@ int main(void)
     test_osal_apis();
     test_gpio_and_uart_ports();
     test_app_composition_root();
+    test_drop_count();
+    test_service_dosing();
     test_motor_apis();
     test_motor_uart_adapter();
+#if APP_DOSING_TEST_ENABLE
+    test_dosing_composition();
+#endif
     return 0;
 }
