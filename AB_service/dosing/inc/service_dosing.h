@@ -17,18 +17,21 @@ typedef enum
 /** @brief 服务阶段及终态。 */
 typedef enum
 {
-    SERVICE_DOSING_IDLE,        /**< 已绑定，等待请求。 */
-    SERVICE_DOSING_PRESTOP,     /**< 先确认停车命令ACK。 */
-    SERVICE_DOSING_DIRECTION,   /**< 配置方向。 */
-    SERVICE_DOSING_MODE,        /**< 配置速度模式。 */
-    SERVICE_DOSING_START_SPEED, /**< 配置起始速度。 */
-    SERVICE_DOSING_SPEED,       /**< 配置运行速度。 */
-    SERVICE_DOSING_START,       /**< 读取计数基线并发出START。 */
-    SERVICE_DOSING_RUNNING,     /**< 监测累计滴数和超时。 */
-    SERVICE_DOSING_TAIL,        /**< STOP已ACK，等待尾滴安静窗口。 */
-    SERVICE_DOSING_DONE,        /**< 达到阈值，STOP已ACK且尾滴窗口已安静。 */
-    SERVICE_DOSING_CANCELLED,   /**< 请求取消；若曾运行，已确认STOP应答并观察尾滴。 */
-    SERVICE_DOSING_FAULT        /**< 首错已锁存；不得自动重启。 */
+    SERVICE_DOSING_IDLE,                /**< 已绑定，等待请求。 */
+    SERVICE_DOSING_PRESTOP,             /**< 先确认停车命令ACK。 */
+    SERVICE_DOSING_DIRECTION,           /**< 配置方向。 */
+    SERVICE_DOSING_MODE,                /**< 配置速度模式。 */
+    SERVICE_DOSING_START_SPEED,         /**< 配置起始速度。 */
+    SERVICE_DOSING_SPEED,               /**< 配置运行速度。 */
+    SERVICE_DOSING_START,               /**< 读取计数基线并发出START。 */
+    SERVICE_DOSING_RUNNING,             /**< 监测累计滴数和超时。 */
+    SERVICE_DOSING_TAIL,                /**< STOP已ACK，等待尾滴安静窗口。 */
+    SERVICE_DOSING_RETRACT_DIRECTION,   /**< 滴定完成，更改方向准备回吸。 */
+    SERVICE_DOSING_RETRACT_START,       /**< 开始回吸。 */
+    SERVICE_DOSING_RETRACT_RUNNING,     /**< 监测回吸是否完成。 */
+    SERVICE_DOSING_DONE,                /**< 达到阈值，STOP已ACK且尾滴窗口已安静。 */
+    SERVICE_DOSING_CANCELLED,           /**< 请求取消；若曾运行，已确认STOP应答并观察尾滴。 */
+    SERVICE_DOSING_FAULT,               /**< 首错已锁存；不得自动重启。 */
 } service_dosing_state_t;
 
 /** @brief 已确认的最新计数与泵事务由调用方适配。 */

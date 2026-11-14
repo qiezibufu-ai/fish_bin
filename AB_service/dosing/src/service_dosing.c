@@ -136,6 +136,9 @@ fw_error_t service_dosing_start(service_dosing_t *self, const service_dosing_req
         case SERVICE_DOSING_START:
         case SERVICE_DOSING_RUNNING:
         case SERVICE_DOSING_TAIL:
+        case SERVICE_DOSING_RETRACT_DIRECTION:
+        case SERVICE_DOSING_RETRACT_START:
+        case SERVICE_DOSING_RETRACT_RUNNING:
             return FW_ERR_DOSING_BUSY;
         default:
             return DOSING_FAIL(self, FW_ERR_DOSING_STATE, FW_OK, NULL, true);
@@ -240,12 +243,37 @@ fw_error_t service_dosing_step(service_dosing_t *self)
             if (now - self->last_drop_ms >= self->request.tail_quiet_ms)
             {
                 self->result.state = self->cancelled ? SERVICE_DOSING_CANCELLED
-                                                     : SERVICE_DOSING_DONE;
+                                                     : SERVICE_DOSING_RETRACT_DIRECTION;
                 return FW_OK;
             }
             if (now - self->stopped_ms >= self->request.tail_max_ms)
             {
                 return DOSING_FAIL(self, FW_ERR_DOSING_TAIL_TIMEOUT, FW_OK, NULL, false);
+            }
+            return FW_OK;
+        case SERVICE_DOSING_RETRACT_DIRECTION:
+            op = SERVICE_DOSING_PUMP_DIRECTION;
+            value = self->request.reverse ? 0U : 1U;
+            next = SERVICE_DOSING_RETRACT_START;
+            break;
+        case SERVICE_DOSING_RETRACT_START:
+            op = SERVICE_DOSING_PUMP_START;
+            self->stopped_ms = dosing_now(self);
+            self->motion_possible = true;
+            self->result.stop_acked = false;
+            next = SERVICE_DOSING_RETRACT_RUNNING;
+            break;
+        case SERVICE_DOSING_RETRACT_RUNNING:
+            now = dosing_now(self);
+            if (now - self->stopped_ms >= 300U) {
+                fw_error_record_t error;
+                err = dosing_command(self, SERVICE_DOSING_PUMP_STOP, 0U, &error);
+                self->result.stop_acked = err == FW_OK;
+                if (err != FW_OK) {
+                    return DOSING_FAIL(self, FW_ERR_DOSING_STOP, err, &error, false);
+                }
+                self->motion_possible = false;
+                self->result.state = SERVICE_DOSING_DONE;
             }
             return FW_OK;
         default:
@@ -290,6 +318,7 @@ fw_error_t service_dosing_cancel(service_dosing_t *self)
             self->cancelled = true;
             return FW_OK;
         case SERVICE_DOSING_RUNNING:
+        case SERVICE_DOSING_RETRACT_RUNNING:
             self->cancelled = true;
             return dosing_stop(self);
         case SERVICE_DOSING_PRESTOP:
@@ -298,6 +327,8 @@ fw_error_t service_dosing_cancel(service_dosing_t *self)
         case SERVICE_DOSING_START_SPEED:
         case SERVICE_DOSING_SPEED:
         case SERVICE_DOSING_START:
+        case SERVICE_DOSING_RETRACT_DIRECTION:
+        case SERVICE_DOSING_RETRACT_START:
             self->result.state = SERVICE_DOSING_CANCELLED;
             return FW_OK;
         default:
