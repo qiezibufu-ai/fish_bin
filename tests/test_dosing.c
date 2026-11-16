@@ -118,13 +118,22 @@ void test_service_dosing(void)
     assert(service_dosing_step(&service) == FW_OK && service.result.state == SERVICE_DOSING_TAIL);
     ++f.now;
     assert(service_dosing_step(&service) == FW_OK);
+    assert(service.result.state == SERVICE_DOSING_RETRACT_DIRECTION);
+    assert(service_dosing_step(&service) == FW_OK);
+    assert(service.result.state == SERVICE_DOSING_RETRACT_START);
+    assert(service_dosing_step(&service) == FW_OK);
+    assert(service.result.state == SERVICE_DOSING_RETRACT_RUNNING);
+    f.now += 499U;
+    assert(service_dosing_step(&service) == FW_OK && f.stops == 2U);
+    ++f.now;
+    assert(service_dosing_step(&service) == FW_OK);
     assert(service_dosing_get_result(&service, &result) == FW_OK);
     assert(result.state == SERVICE_DOSING_DONE && result.drops == 4U && result.stop_acked);
-    assert(f.stops == 2U);
-    assert(service_dosing_step(&service) == FW_OK && f.stops == 2U);
+    assert(f.stops == 3U);
+    assert(service_dosing_step(&service) == FW_OK && f.stops == 3U);
     assert(service_dosing_start(&service, &s_request) == FW_OK);
     assert(service.result.request_id == result.request_id + 1U && !service.result.count_valid);
-    assert(service_dosing_cancel(&service) == FW_OK && f.starts == 1U && f.stops == 2U);
+    assert(service_dosing_cancel(&service) == FW_OK && f.starts == 2U && f.stops == 3U);
 
     run(&service, &f);
     f.now += 100U;

@@ -265,7 +265,7 @@ fw_error_t service_dosing_step(service_dosing_t *self)
             break;
         case SERVICE_DOSING_RETRACT_RUNNING:
             now = dosing_now(self);
-            if (now - self->stopped_ms >= 300U) {
+            if (now - self->stopped_ms >= 500U) {
                 fw_error_record_t error;
                 err = dosing_command(self, SERVICE_DOSING_PUMP_STOP, 0U, &error);
                 self->result.stop_acked = err == FW_OK;

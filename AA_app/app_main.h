@@ -32,11 +32,13 @@ typedef enum
     APP_STAGE_TASK_REGISTER, /**< 统一注册应用任务阶段。 */
     APP_STAGE_VALIDATE,      /**< 内部状态机合法性校验阶段。 */
     APP_STAGE_MOTOR_BIND,    /**< 绑定电机驱动，不发送运动命令。 */
-    APP_STAGE_DROP_COUNT_INIT /**< 初始化台架液滴计数端口。 */
+    APP_STAGE_DROP_COUNT_INIT, /**< 初始化台架液滴计数端口。 */
+    APP_STAGE_BUBBLE_ADC_INIT, /**< 初始化空管传感器模拟输入。 */
+    APP_STAGE_PANEL_INIT /**< 初始化BOOT、WS2812和命令端口。 */
 } app_stage_t;
 
 /**
- * @brief 初始化当前模式的GPIO、PCNT和/或电机UART并绑定能力，不创建后台任务。
+ * @brief 初始化当前模式的GPIO及ADC、PCNT或电机UART并绑定能力，不创建后台任务。
  * @retval FW_OK 平台端口全部就绪，状态进入 APP_STATE_PLATFORM_READY。
  * @retval FW_ERR_APP_ALREADY_INIT 应用已完成初始化。
  * @retval FW_ERR_APP_PLATFORM_INIT_FAILED 某个平台端口初始化失败，底层源头保存在错误快照。

@@ -32,6 +32,11 @@ static const error_entry_t s_entries[] =
     {FW_ERR_DOSING_TAIL_TIMEOUT, "FW_ERR_DOSING_TAIL_TIMEOUT", "尾滴观察超时"},
     {FW_ERR_DOSING_STATE, "FW_ERR_DOSING_STATE", "滴定阶段无效"},
 
+    {FW_ERR_BUBBLE_UNSTABLE, "FW_ERR_BUBBLE_UNSTABLE", "空管标定窗口电压波动超限"},
+    {FW_ERR_APP_CALIBRATION, "FW_ERR_APP_CALIBRATION", "空管标定未通过"},
+    {FW_ERR_APP_DOSE_EXIT, "FW_ERR_APP_DOSE_EXIT", "滴定流程异常中止"},
+    {FW_ERR_APP_CONTROL_STATE, "FW_ERR_APP_CONTROL_STATE", "应用控制状态无效"},
+
     /* AD_platform: 通用总线端口 (0x0401) */
     {FW_ERR_PORT_TIMEOUT, "FW_ERR_PORT_TIMEOUT", "平台总线事务超时"},
     {FW_ERR_PORT_BUSY, "FW_ERR_PORT_BUSY", "平台总线未接受事务"},
@@ -74,6 +79,10 @@ static const error_entry_t s_entries[] =
     {FW_ERR_PCNT_READ, "FW_ERR_PCNT_READ", "PCNT读取失败或累计值超出范围"},
     {FW_ERR_PCNT_RELEASE, "FW_ERR_PCNT_RELEASE", "PCNT资源释放失败"},
     {FW_ERR_PCNT_INVALID_STATE, "FW_ERR_PCNT_INVALID_STATE", "PCNT状态未定义"},
+
+    {FW_ERR_ADC_INIT, "FW_ERR_ADC_INIT", "ADC初始化失败"},
+    {FW_ERR_ADC_READ, "FW_ERR_ADC_READ", "ADC采样或电压换算失败"},
+    {FW_ERR_ADC_RELEASE, "FW_ERR_ADC_RELEASE", "ADC资源释放失败"},
 
     /* AE_common: 环形缓冲区 (0x0501) */
     {FW_ERR_RINGBUF_INVALID_ARG, "FW_ERR_RINGBUF_INVALID_ARG", "环形缓冲区参数无效"},

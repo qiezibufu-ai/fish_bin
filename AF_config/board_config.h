@@ -19,6 +19,8 @@ extern "C" {
 
 /** @brief 板载状态指示灯 GPIO 编号（默认 GPIO48，按实际底板调整）。 */
 #define BOARD_GPIO_STATUS_LED_PIN 48
+/** @brief ESP32-S3板载BOOT按键，低电平有效。 */
+#define BOARD_GPIO_BOOT_PIN 0
 /** @brief RS485 总线1收发方向控制 DE/RE 引脚（自动收发模块不使用；由UART独占RTS时也不在GPIO层配置）。 */
 #define BOARD_GPIO_RS485_BUS1_DE_PIN BOARD_GPIO_PIN_NC
 /** @brief RS485 总线2收发方向控制 DE/RE 引脚（默认 GPIO8，不使用时设为 BOARD_GPIO_PIN_NC）。 */
@@ -28,7 +30,7 @@ extern "C" {
 
 /** @brief QLT1616计数脉冲候选引脚，复用原传感器输入；接入前需完成NPN/PNP电平适配。 */
 #define BOARD_GPIO_DROP_COUNT_PIN BOARD_GPIO_SENSOR_TRIG_PIN
-/** @brief OGR350逻辑输出候选GPIO5；本期仅预留，不初始化、不推断有效电平。 */
+/** @brief 空管传感器模拟输出GPIO5，对应ESP32-S3 ADC1_CH4。 */
 #define BOARD_GPIO_BUBBLE_PIN 5
 /** @brief 手动方向模块可使用GPIO18作为UART RTS；GPIO层不重复配置。 */
 #define BOARD_MOTOR_MANUAL_RTS_PIN 18

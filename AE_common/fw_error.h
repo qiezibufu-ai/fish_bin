@@ -42,6 +42,15 @@ typedef uint32_t fw_error_t;
 /** @brief 滴定阶段无效。 */
 #define FW_ERR_DOSING_STATE UINT32_C(0x0201000B)
 
+/** @brief 空管采样窗口的电压波动超限。 */
+#define FW_ERR_BUBBLE_UNSTABLE UINT32_C(0x02020001)
+/** @brief 应用未能取得有效空管标定。 */
+#define FW_ERR_APP_CALIBRATION UINT32_C(0x01030001)
+/** @brief 应用滴定流程因故中止。 */
+#define FW_ERR_APP_DOSE_EXIT UINT32_C(0x01030002)
+/** @brief 应用控制状态无效。 */
+#define FW_ERR_APP_CONTROL_STATE UINT32_C(0x01030003)
+
 /* ==================== AD_platform: 通用总线端口 (0x0401) ==================== */
 /** @brief 平台总线01的事务超时。 */
 #define FW_ERR_PORT_TIMEOUT UINT32_C(0x04010001)
@@ -117,6 +126,13 @@ typedef uint32_t fw_error_t;
 #define FW_ERR_PCNT_RELEASE UINT32_C(0x04050003)
 /** @brief PCNT端口内部生命周期状态未定义。 */
 #define FW_ERR_PCNT_INVALID_STATE UINT32_C(0x04050004)
+
+/** @brief ADC通道或校准初始化失败（0x0406）。 */
+#define FW_ERR_ADC_INIT UINT32_C(0x04060001)
+/** @brief ADC单次转换或电压换算失败。 */
+#define FW_ERR_ADC_READ UINT32_C(0x04060002)
+/** @brief ADC资源释放失败。 */
+#define FW_ERR_ADC_RELEASE UINT32_C(0x04060003)
 
 /* ==================== AE_common: 环形缓冲区 (0x0501) ======================== */
 /** @brief 环形缓冲区参数非法或容量为0。 */

@@ -885,6 +885,10 @@ static void test_dosing_composition(void)
     test_drop_count_simulate_edge(false);
     assert(app_dosing_advance());
     s_host_tick += APP_DOSING_TEST_TAIL_QUIET_MS;
+    assert(app_dosing_advance() && s_dosing.result.state == SERVICE_DOSING_RETRACT_DIRECTION);
+    assert(app_dosing_advance() && s_dosing.result.state == SERVICE_DOSING_RETRACT_START);
+    assert(app_dosing_advance() && s_dosing.result.state == SERVICE_DOSING_RETRACT_RUNNING);
+    s_host_tick += 500U;
     assert(!app_dosing_advance() && s_dosing.result.state == SERVICE_DOSING_DONE);
     assert(s_dosing.result.drops == APP_DOSING_TEST_TARGET_DROPS + 1U);
     s_host_uart_tx_hook = NULL;

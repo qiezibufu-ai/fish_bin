@@ -2,12 +2,16 @@ idf_component_register(
     SRCS
         "fish_bin.c"
         "../AA_app/app_main.c"
+        "../AA_app/app_dosing_control.c"
+        "../AB_service/bubble/src/service_bubble.c"
+        "../AD_platform/mcu/panel/src/panel_port.c"
         "../AA_app/app_motor_test.c"
         "../AB_service/dosing/src/service_dosing.c"
         "../AC_module/kamoer/driver/src/bsp_kamoer_driver.c"
         "../AC_module/adapter/src/bsp_adapter_port_kamoer.c"
         "../AC_module/adapter/src/bsp_adapter_port_drop_count.c"
         "../AD_platform/mcu/pcnt/src/pcnt_port.c"
+        "../AD_platform/mcu/adc/src/adc_port.c"
         "../AD_platform/os/src/osal_task.c"
         "../AD_platform/os/src/osal_mutex.c"
         "../AD_platform/os/src/osal_sem.c"
@@ -27,12 +31,15 @@ idf_component_register(
         "."
         "../AA_app"
         "../AB_service/dosing/inc"
+        "../AB_service/bubble/inc"
+        "../AD_platform/mcu/panel/inc"
         "../AC_module/kamoer/driver/inc"
         "../AC_module/adapter/inc"
         "../AC_module/dosing_inputs/wrapper/inc"
         "../AD_platform/os/inc"
         "../AD_platform/mcu/gpio/inc"
         "../AD_platform/mcu/pcnt/inc"
+        "../AD_platform/mcu/adc/inc"
         "../AD_platform/mcu/uart/inc"
         "../AE_common"
         "../AF_config"
@@ -43,6 +50,9 @@ idf_component_register(
         esp_driver_gpio
         esp_driver_uart
         esp_driver_pcnt
+        esp_adc
+        esp_driver_rmt
+        esp_driver_usb_serial_jtag
         log
 )
 
@@ -53,4 +63,20 @@ if(DEFINED APP_DOSING_TEST_ENABLE)
     endif()
     target_compile_definitions(${COMPONENT_LIB} PRIVATE
         APP_DOSING_TEST_ENABLE=${APP_DOSING_TEST_ENABLE})
+endif()
+
+if(DEFINED APP_BUBBLE_ADC_TEST_ENABLE)
+    if(NOT APP_BUBBLE_ADC_TEST_ENABLE MATCHES "^[01]$")
+        message(FATAL_ERROR "APP_BUBBLE_ADC_TEST_ENABLE must be 0 or 1")
+    endif()
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE
+        APP_BUBBLE_ADC_TEST_ENABLE=${APP_BUBBLE_ADC_TEST_ENABLE})
+endif()
+
+if(DEFINED APP_DOSING_CONTROL_ENABLE)
+    if(NOT APP_DOSING_CONTROL_ENABLE MATCHES "^[01]$")
+        message(FATAL_ERROR "APP_DOSING_CONTROL_ENABLE must be 0 or 1")
+    endif()
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE
+        APP_DOSING_CONTROL_ENABLE=${APP_DOSING_CONTROL_ENABLE})
 endif()

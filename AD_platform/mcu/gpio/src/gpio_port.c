@@ -5,6 +5,8 @@
 #include "gpio_port.h"
 
 #include "board_config.h"
+#include "bubble_adc_test_config.h"
+#include "dosing_control_config.h"
 #include "osal_task.h"
 
 #include <stddef.h>
@@ -35,7 +37,11 @@ typedef struct
 static const core_gpio_pin_config_t s_default_pin_configs[CORE_GPIO_PIN_MAX] =
 {
     [CORE_GPIO_PIN_STATUS_LED] = {
+#if APP_DOSING_CONTROL_ENABLE && !APP_BUBBLE_ADC_TEST_ENABLE
+        .hw_pin_num = BOARD_GPIO_PIN_NC, /* WS2812由RMT独占。 */
+#else
         .hw_pin_num = BOARD_GPIO_STATUS_LED_PIN,
+#endif
         .direction = CORE_GPIO_DIR_INPUT_OUTPUT,
         .pull_mode = CORE_GPIO_PULL_NONE,
         .default_level = CORE_GPIO_LEVEL_LOW
