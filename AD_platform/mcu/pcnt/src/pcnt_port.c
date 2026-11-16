@@ -1,7 +1,7 @@
 #include "pcnt_port.h"
 
 #include "board_config.h"
-#include "drop_count_test_config.h"
+#include "drop_count_config.h"
 #include "osal_task.h"
 
 #include "driver/pulse_cnt.h"

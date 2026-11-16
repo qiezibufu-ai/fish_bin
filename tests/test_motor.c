@@ -1,5 +1,4 @@
 /** @file test_motor.c @brief 真实电机驱动与应用FSM的协议向量、故障注入及时间回绕测试。 */
-#include "app_motor_test.h"
 #include "bsp_kamoer_driver.h"
 #include "osal_task.h"
 #include <assert.h>
@@ -212,67 +211,9 @@ static void test_motor_failures(void)
     assert(strcmp(fw_error_code_name(motor.error.code), "FW_ERR_UNKNOWN") != 0);
 }
 
-static void setup_app(app_motor_test_t *app, motor_bus_t *bus)
-{
-    memset(app, 0, sizeof(*app));
-    setup_motor(&app->motor, bus);
-}
-
-static void test_motor_application(void)
-{
-    app_motor_test_t app;
-    motor_bus_t bus;
-    setup_app(&app, &bus);
-    assert(app_motor_test_step(&app) == FW_OK && bus.calls == 0U);
-    assert(app_motor_test_start(&app, BSP_KAMOER_CW, 1000U, 10U) == FW_OK);
-    assert(app_motor_test_start(&app, BSP_KAMOER_CW, 1000U, 10U) == FW_ERR_KAMOER_BUSY);
-    while (app.state != APP_MOTOR_RUNNING)
-    {
-        assert(app_motor_test_step(&app) == FW_OK);
-    }
-    assert(bus.starts == 1U && bus.stops == 1U && app.feedback_valid);
-    app.started_ms = osal_task_now_ms() - 11U; /* 同时覆盖uint32回绕。 */
-    assert(app_motor_test_step(&app) == FW_OK);
-    assert(app.state == APP_MOTOR_STOP_ACKED && app.stop_acked && bus.stops == 2U);
-    unsigned calls = bus.calls;
-    assert(app_motor_test_step(&app) == FW_OK && bus.calls == calls);
-    assert(app_motor_test_start(&app, BSP_KAMOER_CCW, 2000U, 100U) == FW_OK);
-    assert(app_motor_test_cancel(&app) == FW_OK && app.state == APP_MOTOR_CANCELLED);
-    calls = bus.calls;
-    assert(app_motor_test_step(&app) == FW_OK && bus.calls == calls);
-    /* 启动超时：仅一次START、一次清理STOP，FAULT轮询永远不会重启动。 */
-    setup_app(&app, &bus);
-    assert(app_motor_test_start(&app, BSP_KAMOER_CW, 1000U, 10U) == FW_OK);
-    while (app.state != APP_MOTOR_START)
-    {
-        assert(app_motor_test_step(&app) == FW_OK);
-    }
-    bus.io_error = FW_ERR_PORT_TIMEOUT;
-    assert(app_motor_test_step(&app) == FW_ERR_APP_MOTOR_TEST_FAILED);
-    assert(app.state == APP_MOTOR_FAULT && !app.stop_acked);
-    assert(app.error.cause_code == FW_ERR_KAMOER_EXECUTION_UNKNOWN);
-    assert(bus.starts == 1U && bus.stops == 2U);
-    assert(app.error.state == APP_MOTOR_START && app.error.cleanup_code != FW_OK);
-    assert(app.error.origin_line == 42U && app.error.native_status == -123);
-    calls = bus.calls;
-    app_motor_test_result_t result;
-    assert(app_motor_test_get_result(&app, &result) == FW_OK);
-    assert(result.state == APP_MOTOR_FAULT && result.error.code == FW_ERR_APP_MOTOR_TEST_FAILED);
-    assert(app_motor_test_step(&app) == app.error.code && bus.calls == calls);
-    assert(app_motor_test_start(&app, BSP_KAMOER_CW, 1000U, 10U) == app.error.code);
-    bus.io_error = FW_OK;
-    assert(app_motor_test_cancel(&app) == FW_OK && app.stop_acked);
-    assert(app.state == APP_MOTOR_FAULT && app.error.code == FW_ERR_APP_MOTOR_TEST_FAILED);
-    setup_app(&app, &bus);
-    app.state = (app_motor_test_state_t)99;
-    assert(app_motor_test_step(&app) == FW_ERR_APP_MOTOR_INVALID_STATE);
-    assert(app.error.state == 99U && app.state == APP_MOTOR_FAULT);
-}
-
 void test_motor_apis(void)
 {
     test_motor_vectors();
     test_motor_failures();
-    test_motor_application();
-    puts("PASS AC/AA motor: manual vectors, feedback, CRC/echo/exception, unknown writes, cleanup, cancellation, wrap");
+    puts("PASS AC motor: manual vectors, feedback, CRC/echo/exception, unknown writes, cleanup");
 }

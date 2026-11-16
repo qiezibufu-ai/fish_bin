@@ -25,6 +25,78 @@
 #include "../AD_platform/mcu/uart/src/uart_port.c"
 #include "../AA_app/app_main.c"
 
+/* ADC与面板在目标上由ESP-IDF实现；主机替身提供确定性的输入。 */
+static bool s_host_adc_ready;
+static bool s_host_panel_ready;
+static bool s_host_boot_pressed;
+static const char *s_host_usb_line;
+
+fw_error_t core_adc_init(fw_error_record_t *error)
+{
+    *error = (fw_error_record_t){0};
+    s_host_adc_ready = true;
+    return FW_OK;
+}
+
+fw_error_t core_adc_read(core_adc_sample_t *sample, fw_error_record_t *error)
+{
+    assert(s_host_adc_ready);
+    *sample = (core_adc_sample_t){.voltage_mv = 1120, .voltage_valid = true};
+    *error = (fw_error_record_t){0};
+    return FW_OK;
+}
+
+fw_error_t core_adc_deinit(fw_error_record_t *error)
+{
+    *error = (fw_error_record_t){0};
+    s_host_adc_ready = false;
+    return FW_OK;
+}
+
+fw_error_t core_panel_init(int32_t *native)
+{
+    *native = 0;
+    s_host_panel_ready = true;
+    s_host_boot_pressed = false;
+    s_host_usb_line = NULL;
+    return FW_OK;
+}
+
+fw_error_t core_panel_deinit(void)
+{
+    s_host_panel_ready = false;
+    return FW_OK;
+}
+
+bool core_panel_boot_pressed(void)
+{
+    assert(s_host_panel_ready);
+    return s_host_boot_pressed;
+}
+
+fw_error_t core_panel_read(core_panel_rx_t source, char *data, size_t capacity, size_t *count)
+{
+    assert(s_host_panel_ready);
+    *count = 0U;
+    if (source == CORE_PANEL_RX_USB && s_host_usb_line != NULL)
+    {
+        *count = strlen(s_host_usb_line);
+        assert(*count <= capacity);
+        memcpy(data, s_host_usb_line, *count);
+        s_host_usb_line = NULL;
+    }
+    return FW_OK;
+}
+
+fw_error_t core_panel_rgb(uint8_t red, uint8_t green, uint8_t blue)
+{
+    assert(s_host_panel_ready);
+    (void)red;
+    (void)green;
+    (void)blue;
+    return FW_OK;
+}
+
 /* ==================== 主机确定性 OSAL 后端替身 ============================ */
 
 static bool s_host_in_isr = false;
@@ -513,7 +585,9 @@ static void test_fw_error_and_ring_buffer(void)
         FW_ERR_KAMOER_IO, FW_ERR_KAMOER_TIMEOUT, FW_ERR_KAMOER_CRC,
         FW_ERR_KAMOER_RESPONSE, FW_ERR_KAMOER_EXCEPTION,
         FW_ERR_KAMOER_EXECUTION_UNKNOWN, FW_ERR_KAMOER_INVALID_STATE,
-        FW_ERR_APP_MOTOR_TEST_FAILED, FW_ERR_APP_MOTOR_INVALID_STATE
+        FW_ERR_ADC_INIT, FW_ERR_ADC_READ, FW_ERR_ADC_RELEASE,
+        FW_ERR_BUBBLE_UNSTABLE, FW_ERR_APP_CALIBRATION, FW_ERR_APP_DOSE_EXIT,
+        FW_ERR_APP_CONTROL_STATE
     };
 
     for (size_t i = 0U; i < sizeof(all_codes) / sizeof(all_codes[0]); ++i)
@@ -649,13 +723,19 @@ static void test_gpio_and_uart_ports(void)
 
     /* 未初始化时拒绝操作 */
     core_gpio_level_t lvl = CORE_GPIO_LEVEL_HIGH;
-    assert(core_gpio_write_pin(CORE_GPIO_PIN_STATUS_LED, CORE_GPIO_LEVEL_HIGH) == FW_ERR_GPIO_NOT_READY);
+    assert(core_gpio_write_pin(CORE_GPIO_PIN_RS485_BUS1_DE, CORE_GPIO_LEVEL_HIGH) == FW_ERR_GPIO_NOT_READY);
 
     /* GPIO 正常初始化、翻转、ISR 与非法状态检测 */
     assert(core_gpio_init() == FW_OK);
-    assert(core_gpio_read_pin(CORE_GPIO_PIN_STATUS_LED, &lvl) == FW_OK && lvl == CORE_GPIO_LEVEL_LOW);
-    assert(core_gpio_toggle_pin(CORE_GPIO_PIN_STATUS_LED) == FW_OK);
-    assert(core_gpio_read_pin(CORE_GPIO_PIN_STATUS_LED, &lvl) == FW_OK && lvl == CORE_GPIO_LEVEL_HIGH);
+    assert(!s_gpio_slots[CORE_GPIO_PIN_STATUS_LED].configured);
+    const core_gpio_pin_config_t output = {
+        .hw_pin_num = 9, .direction = CORE_GPIO_DIR_INPUT_OUTPUT,
+        .pull_mode = CORE_GPIO_PULL_NONE, .default_level = CORE_GPIO_LEVEL_LOW
+    };
+    assert(core_gpio_configure_pin(CORE_GPIO_PIN_RS485_BUS1_DE, &output) == FW_OK);
+    assert(core_gpio_read_pin(CORE_GPIO_PIN_RS485_BUS1_DE, &lvl) == FW_OK && lvl == CORE_GPIO_LEVEL_LOW);
+    assert(core_gpio_toggle_pin(CORE_GPIO_PIN_RS485_BUS1_DE) == FW_OK);
+    assert(core_gpio_read_pin(CORE_GPIO_PIN_RS485_BUS1_DE, &lvl) == FW_OK && lvl == CORE_GPIO_LEVEL_HIGH);
 
     uint32_t isr_inc = 3U;
     assert(core_gpio_register_isr(CORE_GPIO_PIN_SENSOR_TRIG, CORE_GPIO_IRQ_FALLING,
@@ -666,7 +746,7 @@ static void test_gpio_and_uart_ports(void)
 
     /* 注入非法状态并验证统一 FAULT 入口与首个错误锁存 */
     s_gpio_state = (core_gpio_state_t)77;
-    assert(core_gpio_write_pin(CORE_GPIO_PIN_STATUS_LED, CORE_GPIO_LEVEL_LOW) == FW_ERR_GPIO_INVALID_STATE);
+    assert(core_gpio_write_pin(CORE_GPIO_PIN_RS485_BUS1_DE, CORE_GPIO_LEVEL_LOW) == FW_ERR_GPIO_INVALID_STATE);
     core_gpio_state_t gst = CORE_GPIO_STATE_UNINITIALIZED;
     fw_error_record_t gerr = {0};
     assert(core_gpio_get_status(&gst, &gerr) == FW_OK);
@@ -732,7 +812,6 @@ static void test_app_composition_root(void)
     s_host_uart_uninstall_err = ESP_OK;
     s_host_task_create_err = OSAL_OK;
 
-#if !APP_DROP_COUNT_TEST_ENABLE || APP_DOSING_TEST_ENABLE
     /* 注入底层 UART 安装错误，验证 AA_app 捕获本层位置并保留底层 origin 源头 */
     s_host_uart_install_err = -555;
     assert(app_init() == FW_ERR_APP_PLATFORM_INIT_FAILED);
@@ -747,41 +826,30 @@ static void test_app_composition_root(void)
     assert(aerr.origin_file != NULL && strstr(aerr.origin_file, "uart_port.c") != NULL);
     assert(aerr.origin_line > 0U);
 
-    /* 显式反初始化后正常启动组合根 */
+    assert(!s_host_adc_ready && !s_host_panel_ready);
+    uint32_t count = 0U;
+    assert(core_pcnt_read(&count) == FW_ERR_PORT_NOT_READY);
     s_host_uart_install_err = ESP_OK;
     assert(app_deinit() == FW_OK);
-#else
-    app_state_t ast = APP_STATE_UNINITIALIZED;
-    fw_error_record_t aerr = {0};
-    /* 计数台架不应尝试初始化电机UART。 */
-    s_host_uart_install_err = -555;
+
+    /* 任务注册失败时，ADC、PCNT、UART和面板都必须释放。 */
     s_host_task_create_err = OSAL_ERR_NO_MEMORY;
     assert(app_init() == FW_ERR_APP_TASK_CREATE_FAILED);
-    uint32_t count = 0U;
+    assert(!s_host_adc_ready && !s_host_panel_ready);
+    assert(!s_uart_channels[CORE_UART_ID_1].driver_installed);
     assert(core_pcnt_read(&count) == FW_ERR_PORT_NOT_READY);
     assert(app_deinit() == FW_OK);
     s_host_task_create_err = OSAL_OK;
-#endif
+
     assert(app_init() == FW_OK);
     assert(app_get_status(&ast, &aerr) == FW_OK && ast == APP_STATE_RUNNING);
     assert(app_init() == FW_ERR_APP_ALREADY_INIT);
-#if APP_DOSING_TEST_ENABLE
+    assert(s_host_adc_ready && s_host_panel_ready);
     assert(s_uart_channels[CORE_UART_ID_1].driver_installed);
-    uint32_t count;
+    assert(!s_uart_channels[CORE_UART_ID_2].driver_installed);
     assert(core_pcnt_read(&count) == FW_OK && count == 0U);
     assert(s_dosing.result.state == SERVICE_DOSING_IDLE);
     assert(s_host_loopback_len[CORE_UART_ID_1] == 0U);
-#elif APP_DROP_COUNT_TEST_ENABLE
-    assert(!s_uart_channels[CORE_UART_ID_1].driver_installed);
-    assert(core_pcnt_read(&count) == FW_OK && count == 0U);
-    s_host_uart_install_err = ESP_OK;
-#else
-    assert(s_uart_channels[CORE_UART_ID_1].config.mode == CORE_UART_MODE_NORMAL);
-    assert(s_uart_channels[CORE_UART_ID_1].config.rts_de_pin == BOARD_GPIO_PIN_NC);
-    assert(s_uart_channels[CORE_UART_ID_1].config.tx_buf_bytes == 0U);
-    assert(!s_uart_channels[CORE_UART_ID_2].driver_installed);
-    assert(s_motor_test.state == APP_MOTOR_IDLE && s_host_loopback_len[CORE_UART_ID_1] == 0U);
-#endif
     assert(app_deinit() == FW_OK);
     puts("PASS AA_app: composition root init, rollback cleanup and origin error propagation");
 }
@@ -859,8 +927,13 @@ static void test_motor_uart_adapter(void)
     puts("PASS motor UART adapter: fragmented frames, auto direction, total timeout across tick wrap");
 }
 
-#if APP_DOSING_TEST_ENABLE
 void test_drop_count_simulate_edge(bool rising);
+
+static void control_tick(uint32_t ms)
+{
+    s_host_tick += ms;
+    app_dosing_control_step();
+}
 
 static void test_dosing_composition(void)
 {
@@ -868,35 +941,50 @@ static void test_dosing_composition(void)
     s_host_uart_tx_hook = simulate_motor_response;
     s_host_delay_hook = release_fragment;
     s_discard_response = false;
-    assert(app_dosing_submit());
+
+    s_host_usb_line = "10\n";
+    control_tick(DOSING_CONTROL_BUTTON_MS);
+    assert(s_dosing.result.state == SERVICE_DOSING_IDLE);
+
+    s_host_boot_pressed = true;
+    control_tick(DOSING_CONTROL_PERIOD_MS);
+    control_tick(DOSING_CONTROL_BUTTON_MS);
+    for (unsigned i = 1U; i < BUBBLE_CALIBRATION_SAMPLES; ++i)
+    {
+        control_tick(DOSING_CONTROL_SAMPLE_MS);
+    }
+    s_host_boot_pressed = false;
+    control_tick(DOSING_CONTROL_PERIOD_MS);
+
+    s_host_usb_line = "10\n";
     for (unsigned i = 0U; i < 6U; ++i)
     {
-        assert(app_dosing_advance());
+        control_tick(DOSING_CONTROL_PERIOD_MS);
     }
     assert(s_dosing.result.state == SERVICE_DOSING_RUNNING);
-    for (uint32_t i = 0U; i < APP_DOSING_TEST_TARGET_DROPS; ++i)
+    for (unsigned i = 0U; i < 10U; ++i)
     {
         test_drop_count_simulate_edge(false);
         test_drop_count_simulate_edge(true);
     }
-    assert(app_dosing_advance() && s_dosing.result.state == SERVICE_DOSING_TAIL);
-    assert(s_dosing.result.stop_acked);
-    assert(s_dosing.result.stop_drops == APP_DOSING_TEST_TARGET_DROPS);
+    control_tick(DOSING_CONTROL_PERIOD_MS);
+    assert(s_dosing.result.state == SERVICE_DOSING_TAIL && s_dosing.result.stop_acked);
+    assert(s_dosing.result.stop_drops == 10U);
     test_drop_count_simulate_edge(false);
-    assert(app_dosing_advance());
-    s_host_tick += APP_DOSING_TEST_TAIL_QUIET_MS;
-    assert(app_dosing_advance() && s_dosing.result.state == SERVICE_DOSING_RETRACT_DIRECTION);
-    assert(app_dosing_advance() && s_dosing.result.state == SERVICE_DOSING_RETRACT_START);
-    assert(app_dosing_advance() && s_dosing.result.state == SERVICE_DOSING_RETRACT_RUNNING);
-    s_host_tick += 500U;
-    assert(!app_dosing_advance() && s_dosing.result.state == SERVICE_DOSING_DONE);
-    assert(s_dosing.result.drops == APP_DOSING_TEST_TARGET_DROPS + 1U);
+    control_tick(DOSING_CONTROL_PERIOD_MS);
+    control_tick(DOSING_CONTROL_TAIL_QUIET_MS);
+    assert(s_dosing.result.state == SERVICE_DOSING_RETRACT_DIRECTION);
+    control_tick(DOSING_CONTROL_PERIOD_MS);
+    control_tick(DOSING_CONTROL_PERIOD_MS);
+    assert(s_dosing.result.state == SERVICE_DOSING_RETRACT_RUNNING);
+    control_tick(500U);
+    assert(s_dosing.result.state == SERVICE_DOSING_DONE && s_dosing.result.stop_acked);
+    assert(s_dosing.result.drops == 11U);
     s_host_uart_tx_hook = NULL;
     s_host_delay_hook = NULL;
     assert(app_deinit() == FW_OK);
-    puts("PASS dosing composition: application, PCNT snapshots and Kamoer UART frames");
+    puts("PASS dosing composition: BOOT calibration, USB order, PCNT, RS485 and retract");
 }
-#endif
 
 void test_motor_apis(void);
 void test_drop_count(void);
@@ -912,8 +1000,6 @@ int main(void)
     test_service_dosing();
     test_motor_apis();
     test_motor_uart_adapter();
-#if APP_DOSING_TEST_ENABLE
     test_dosing_composition();
-#endif
     return 0;
 }

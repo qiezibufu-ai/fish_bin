@@ -2,7 +2,7 @@
 #include "board_config.h"
 #include "bsp_adapter_port_drop_count.h"
 #include "driver/pulse_cnt.h"
-#include "drop_count_test_config.h"
+#include "drop_count_config.h"
 #include "pcnt_port.h"
 
 #include <assert.h>

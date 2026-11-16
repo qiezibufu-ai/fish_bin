@@ -5,7 +5,6 @@ idf_component_register(
         "../AA_app/app_dosing_control.c"
         "../AB_service/bubble/src/service_bubble.c"
         "../AD_platform/mcu/panel/src/panel_port.c"
-        "../AA_app/app_motor_test.c"
         "../AB_service/dosing/src/service_dosing.c"
         "../AC_module/kamoer/driver/src/bsp_kamoer_driver.c"
         "../AC_module/adapter/src/bsp_adapter_port_kamoer.c"
@@ -55,28 +54,3 @@ idf_component_register(
         esp_driver_usb_serial_jtag
         log
 )
-
-# 可通过 idf.py -DAPP_DOSING_TEST_ENABLE=1 build 选择清水联调镜像。
-if(DEFINED APP_DOSING_TEST_ENABLE)
-    if(NOT APP_DOSING_TEST_ENABLE MATCHES "^[01]$")
-        message(FATAL_ERROR "APP_DOSING_TEST_ENABLE must be 0 or 1")
-    endif()
-    target_compile_definitions(${COMPONENT_LIB} PRIVATE
-        APP_DOSING_TEST_ENABLE=${APP_DOSING_TEST_ENABLE})
-endif()
-
-if(DEFINED APP_BUBBLE_ADC_TEST_ENABLE)
-    if(NOT APP_BUBBLE_ADC_TEST_ENABLE MATCHES "^[01]$")
-        message(FATAL_ERROR "APP_BUBBLE_ADC_TEST_ENABLE must be 0 or 1")
-    endif()
-    target_compile_definitions(${COMPONENT_LIB} PRIVATE
-        APP_BUBBLE_ADC_TEST_ENABLE=${APP_BUBBLE_ADC_TEST_ENABLE})
-endif()
-
-if(DEFINED APP_DOSING_CONTROL_ENABLE)
-    if(NOT APP_DOSING_CONTROL_ENABLE MATCHES "^[01]$")
-        message(FATAL_ERROR "APP_DOSING_CONTROL_ENABLE must be 0 or 1")
-    endif()
-    target_compile_definitions(${COMPONENT_LIB} PRIVATE
-        APP_DOSING_CONTROL_ENABLE=${APP_DOSING_CONTROL_ENABLE})
-endif()

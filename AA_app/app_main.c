@@ -4,42 +4,19 @@
  */
 #include "app_main.h"
 
-#include "board_config.h"
-#include "bubble_adc_test_config.h"
-#include "dosing_control_config.h"
-#include "dosing_test_config.h"
-#include "drop_count_test_config.h"
-
-#define APP_RUN_CONTROL (APP_DOSING_CONTROL_ENABLE && !APP_BUBBLE_ADC_TEST_ENABLE)
-#define APP_USE_DOSING (APP_RUN_CONTROL || APP_DOSING_TEST_ENABLE)
-#if APP_RUN_CONTROL
-#include "app_dosing_control.h"
-#include "panel_port.h"
-#endif
-#if !APP_BUBBLE_ADC_TEST_ENABLE && (APP_DROP_COUNT_TEST_ENABLE || APP_USE_DOSING)
-#include "bsp_adapter_port_drop_count.h"
-#include "pcnt_port.h"
-#include <inttypes.h>
-#include <stdio.h>
-#endif
-#if !APP_BUBBLE_ADC_TEST_ENABLE && (APP_USE_DOSING || !APP_DROP_COUNT_TEST_ENABLE)
-#include "motor_config.h"
-#include "uart_port.h"
-#endif
-#if !APP_BUBBLE_ADC_TEST_ENABLE && APP_USE_DOSING
-#include "bsp_adapter_port_kamoer.h"
-#include "service_dosing.h"
-#elif !APP_BUBBLE_ADC_TEST_ENABLE && !APP_DROP_COUNT_TEST_ENABLE
-#include "app_motor_test.h"
-#include "motor_test_config.h"
-#endif
-#if APP_BUBBLE_ADC_TEST_ENABLE || APP_RUN_CONTROL
 #include "adc_port.h"
-#include <inttypes.h>
-#include <stdio.h>
-#endif
+#include "app_dosing_control.h"
+#include "board_config.h"
+#include "bsp_adapter_port_drop_count.h"
+#include "bsp_adapter_port_kamoer.h"
+#include "dosing_control_config.h"
 #include "gpio_port.h"
+#include "motor_config.h"
 #include "osal.h"
+#include "panel_port.h"
+#include "pcnt_port.h"
+#include "service_dosing.h"
+#include "uart_port.h"
 
 #include <stddef.h>
 #include <string.h>
@@ -47,7 +24,7 @@
 /** @brief 组合根管理的任务枚举。 */
 typedef enum
 {
-    APP_TASK_BOOTSTRAP = 0, /**< 系统心跳与诊断监控任务。 */
+    APP_TASK_BOOTSTRAP = 0, /**< 滴定控制任务。 */
     APP_TASK_COUNT          /**< 任务总数。 */
 } app_task_id_t;
 
@@ -61,24 +38,17 @@ typedef struct
     osal_task_handle_t *handle; /**< 任务句柄存储位置。 */
 } app_task_spec_t;
 
-#if !APP_BUBBLE_ADC_TEST_ENABLE && (APP_DROP_COUNT_TEST_ENABLE || APP_USE_DOSING)
 static const bsp_dosing_inputs_ops_t s_drop_inputs = {
     .read_snapshot = bsp_adapter_port_drop_count_read,
     .context = NULL
 };
-#endif
-#if !APP_BUBBLE_ADC_TEST_ENABLE && APP_USE_DOSING
 static bsp_kamoer_t s_dosing_motor;
 static service_dosing_t s_dosing;
-#elif !APP_BUBBLE_ADC_TEST_ENABLE && !APP_DROP_COUNT_TEST_ENABLE
-static app_motor_test_t s_motor_test;
-#endif
 
 static app_state_t s_app_state = APP_STATE_UNINITIALIZED;
 static fw_error_record_t s_app_error = {0};
 static osal_task_handle_t s_bootstrap_task_handle = NULL;
 
-#if !APP_BUBBLE_ADC_TEST_ENABLE && APP_USE_DOSING
 static fw_error_t app_dosing_pump(void *context, service_dosing_pump_op_t op,
                                   uint32_t value, fw_error_record_t *error)
 {
@@ -144,152 +114,22 @@ static fw_error_t app_dosing_bind(void)
     return service_dosing_init(&s_dosing, &ops);
 }
 
-#if !APP_RUN_CONTROL
-static bool app_dosing_submit(void)
-{
-    const service_dosing_request_t request = {
-        .target_drops = APP_DOSING_TEST_TARGET_DROPS,
-        .speed_centi_rpm = APP_DOSING_TEST_SPEED_CENTI_RPM,
-        .reverse = APP_DOSING_TEST_REVERSE != 0,
-        .no_drop_ms = APP_DOSING_TEST_NO_DROP_MS,
-        .max_run_ms = APP_DOSING_TEST_MAX_RUN_MS,
-        .tail_quiet_ms = APP_DOSING_TEST_TAIL_QUIET_MS,
-        .tail_max_ms = APP_DOSING_TEST_TAIL_MAX_MS
-    };
-    fw_error_t err = service_dosing_start(&s_dosing, &request);
-    if (err != FW_OK)
-    {
-        printf("dosing submit=%s\n", fw_error_code_name(err));
-    }
-    return err == FW_OK;
-}
-
-static bool app_dosing_advance(void)
-{
-    (void)service_dosing_step(&s_dosing);
-    service_dosing_result_t result;
-    if (service_dosing_get_result(&s_dosing, &result) != FW_OK ||
-        (result.state != SERVICE_DOSING_DONE && result.state != SERVICE_DOSING_CANCELLED &&
-         result.state != SERVICE_DOSING_FAULT))
-    {
-        return true;
-    }
-    /* 仅终态输出，串口日志不会插入运行到停泵的控制路径。 */
-    const char *state = result.state == SERVICE_DOSING_DONE ? "DONE" :
-                        result.state == SERVICE_DOSING_CANCELLED ? "CANCELLED" : "FAULT";
-    printf("dosing: state=%s target=%" PRIu32 " stop=%" PRIu32 " total=%" PRIu32
-           " count_valid=%u stop_acked=%u error=%s cause=%s cleanup=%s\n",
-           state, result.target_drops, result.stop_drops, result.drops,
-           (unsigned)result.count_valid, (unsigned)result.stop_acked,
-           fw_error_code_name(result.error.code), fw_error_code_name(result.error.cause_code),
-           fw_error_code_name(result.error.cleanup_code));
-    return false;
-}
-#endif
-#endif
-
-#if APP_BUBBLE_ADC_TEST_ENABLE
-static void app_bubble_adc_report(void)
-{
-    core_adc_sample_t sample;
-    fw_error_record_t error;
-    fw_error_t err = core_adc_read(&sample, &error);
-    uint32_t now = osal_task_now_ms();
-    if (err != FW_OK)
-    {
-        printf("bubble_adc: gpio=%d t_ms=%" PRIu32 " error=%s stage=%u native=%" PRId32 "\n",
-               BOARD_GPIO_BUBBLE_PIN, now, fw_error_code_name(err),
-               (unsigned)error.stage, error.native_status);
-    }
-    else if (sample.voltage_valid)
-    {
-        printf("bubble_adc: gpio=%d t_ms=%" PRIu32 " raw=%d mv=%d\n",
-               BOARD_GPIO_BUBBLE_PIN, now, sample.raw, sample.voltage_mv);
-    }
-    else
-    {
-        printf("bubble_adc: gpio=%d t_ms=%" PRIu32 " raw=%d mv=NA\n",
-               BOARD_GPIO_BUBBLE_PIN, now, sample.raw);
-    }
-}
-#endif
-
-/** @brief 按构建配置运行一种台架模式。 */
+/** @brief 滴定控制任务独占标定、命令入口和电机服务。 */
 static void bootstrap_task_entry(void *argument)
 {
     (void)argument;
-#if APP_BUBBLE_ADC_TEST_ENABLE
-    const uint32_t period_ms = APP_BUBBLE_ADC_TEST_PERIOD_MS;
-#elif APP_RUN_CONTROL
-    const uint32_t period_ms = DOSING_CONTROL_PERIOD_MS;
-#elif APP_USE_DOSING
-    bool active = app_dosing_submit();
-    const uint32_t period_ms = APP_DOSING_TEST_PERIOD_MS;
-#elif APP_DROP_COUNT_TEST_ENABLE
-    uint32_t last_count = 0U;
-    bool reported = false;
-    bool sampling = true;
-    const uint32_t period_ms = APP_DROP_COUNT_REPORT_PERIOD_MS;
-    printf("drop_count: GPIO%d falling edge; motor commands off\n", BOARD_GPIO_DROP_COUNT_PIN);
-#else
-    const uint32_t period_ms = BOARD_TASK_BOOTSTRAP_PERIOD_MS;
-#if APP_MOTOR_TEST_ENABLE
-    (void)app_motor_test_start(&s_motor_test,
-                               (bsp_kamoer_direction_t)APP_MOTOR_TEST_DIRECTION,
-                               APP_MOTOR_TEST_SPEED_CENTI_RPM,
-                               APP_MOTOR_TEST_DURATION_MS);
-#endif
-#endif
     osal_tick_type_t last_wake = osal_task_get_tick_count();
     for (;;)
     {
-#if APP_BUBBLE_ADC_TEST_ENABLE
-        app_bubble_adc_report();
-#elif APP_RUN_CONTROL
         app_dosing_control_step();
-#elif APP_USE_DOSING
-        if (active)
-        {
-            active = app_dosing_advance();
-        }
-#elif APP_DROP_COUNT_TEST_ENABLE
-        if (sampling)
-        {
-            bsp_dosing_inputs_snapshot_t snapshot;
-            fw_error_t err = s_drop_inputs.read_snapshot(s_drop_inputs.context, &snapshot);
-            if (err != FW_OK)
-            {
-                fw_error_record_t error = {0};
-                (void)core_pcnt_get_error(&error);
-                printf("drop_count error=%s stage=%u native=%" PRId32 " cleanup=%s\n",
-                       fw_error_code_name(err), (unsigned)error.stage,
-                       error.native_status, fw_error_code_name(error.cleanup_code));
-                sampling = false;
-            }
-            else if (!reported || snapshot.drop_count != last_count)
-            {
-                printf("drop_count: total=%" PRIu32 " delta=%" PRIu32 " t_ms=%" PRIu32 "\n",
-                       snapshot.drop_count, snapshot.drop_count - last_count, snapshot.timestamp_ms);
-                last_count = snapshot.drop_count;
-                reported = true;
-            }
-        }
-#else
-        (void)app_motor_test_step(&s_motor_test);
-#endif
-        /* 短事务可能超过周期；超期后重新锚定，避免连续追赶。 */
-        if (osal_task_elapsed_ms(osal_task_get_tick_count(), last_wake) >=
-            period_ms)
+        /* 串口事务可能超过周期；超期后重新锚定，避免连续追赶。 */
+        if (osal_task_elapsed_ms(osal_task_get_tick_count(), last_wake) >= DOSING_CONTROL_PERIOD_MS)
         {
             last_wake = osal_task_get_tick_count();
         }
-        if (osal_task_wait_until(&last_wake, period_ms) != OSAL_OK)
+        if (osal_task_wait_until(&last_wake, DOSING_CONTROL_PERIOD_MS) != OSAL_OK)
         {
-#if !APP_BUBBLE_ADC_TEST_ENABLE && APP_USE_DOSING
             (void)service_dosing_cancel(&s_dosing);
-#elif !APP_BUBBLE_ADC_TEST_ENABLE && !APP_DROP_COUNT_TEST_ENABLE
-            (void)app_motor_test_cancel(&s_motor_test);
-#endif
             /* 保留句柄供维护清理；FreeRTOS任务入口不返回。 */
             (void)osal_task_suspend(NULL);
         }
@@ -345,37 +185,27 @@ static fw_error_t app_fail_at(fw_error_t code, fw_error_t cause_code,
 /* 先释放采集/通信端口，再撤销GPIO配置。 */
 static fw_error_t app_release_platform(void)
 {
-#if APP_RUN_CONTROL
     fw_error_t panel = core_panel_deinit();
+    fw_error_record_t record;
+    fw_error_t adc = core_adc_deinit(&record);
+    fw_error_t uart = core_uart_deinit(CORE_UART_ID_1);
+    fw_error_t pcnt = core_pcnt_deinit();
     if (panel != FW_OK)
     {
         return panel;
     }
-#endif
-#if APP_BUBBLE_ADC_TEST_ENABLE || APP_RUN_CONTROL
-    fw_error_record_t record;
-    fw_error_t adc = core_adc_deinit(&record);
     if (adc != FW_OK)
     {
         return adc;
     }
-#endif
-#if !APP_BUBBLE_ADC_TEST_ENABLE && (APP_USE_DOSING || !APP_DROP_COUNT_TEST_ENABLE)
-    fw_error_t uart = core_uart_deinit(CORE_UART_ID_1);
-#endif
-#if !APP_BUBBLE_ADC_TEST_ENABLE && (APP_USE_DOSING || APP_DROP_COUNT_TEST_ENABLE)
-    fw_error_t pcnt = core_pcnt_deinit();
-    if (pcnt != FW_OK)
-    {
-        return pcnt;
-    }
-#endif
-#if !APP_BUBBLE_ADC_TEST_ENABLE && (APP_USE_DOSING || !APP_DROP_COUNT_TEST_ENABLE)
     if (uart != FW_OK)
     {
         return uart;
     }
-#endif
+    if (pcnt != FW_OK)
+    {
+        return pcnt;
+    }
     return core_gpio_deinit();
 }
 
@@ -407,7 +237,6 @@ fw_error_t app_init_platform(void)
                         0, false, FW_OK, APP_STAGE_GPIO_INIT);
     }
 
-#if APP_BUBBLE_ADC_TEST_ENABLE || APP_RUN_CONTROL
     fw_error_record_t adc_record;
     err = core_adc_init(&adc_record);
     if (err != FW_OK)
@@ -420,8 +249,7 @@ fw_error_t app_init_platform(void)
         return APP_FAIL(FW_ERR_APP_PLATFORM_INIT_FAILED, err, &adc_record,
                         0, false, cleanup, APP_STAGE_BUBBLE_ADC_INIT);
     }
-#endif
-#if !APP_BUBBLE_ADC_TEST_ENABLE && (APP_DROP_COUNT_TEST_ENABLE || APP_USE_DOSING)
+
     err = core_pcnt_init();
     if (err != FW_OK)
     {
@@ -435,8 +263,7 @@ fw_error_t app_init_platform(void)
         return APP_FAIL(FW_ERR_APP_PLATFORM_INIT_FAILED, err, &record,
                         0, false, cleanup, APP_STAGE_DROP_COUNT_INIT);
     }
-#endif
-#if !APP_BUBBLE_ADC_TEST_ENABLE && (APP_USE_DOSING || !APP_DROP_COUNT_TEST_ENABLE)
+
     core_uart_config_t motor_uart;
     (void)core_uart_get_default_config(CORE_UART_ID_1, &motor_uart);
     motor_uart.baudrate = MOTOR_BAUDRATE;
@@ -457,25 +284,14 @@ fw_error_t app_init_platform(void)
     }
 
     /* 当前只启用电机UART1；UART2候选GPIO19/20保留给USB，不初始化。 */
-#if !APP_BUBBLE_ADC_TEST_ENABLE && APP_USE_DOSING
     err = app_dosing_bind();
-#else
-    err = app_motor_test_init(&s_motor_test);
-#endif
     if (err != FW_OK)
     {
         fw_error_t cleanup = app_release_platform();
-#if !APP_BUBBLE_ADC_TEST_ENABLE && APP_USE_DOSING
-        const fw_error_record_t *origin = &s_dosing_motor.error;
-#else
-        const fw_error_record_t *origin = &s_motor_test.error;
-#endif
-        return APP_FAIL(FW_ERR_APP_PLATFORM_INIT_FAILED, err, origin,
+        return APP_FAIL(FW_ERR_APP_PLATFORM_INIT_FAILED, err, &s_dosing_motor.error,
                         0, false, cleanup, APP_STAGE_MOTOR_BIND);
     }
 
-#endif
-#if APP_RUN_CONTROL
     int32_t native;
     err = core_panel_init(&native);
     if (err != FW_OK)
@@ -485,7 +301,6 @@ fw_error_t app_init_platform(void)
                         native, true, cleanup, APP_STAGE_PANEL_INIT);
     }
     app_dosing_control_init(&s_dosing);
-#endif
 
     s_app_state = APP_STATE_PLATFORM_READY;
     return FW_OK;

@@ -18,7 +18,7 @@ extern "C" {
 /** @brief 逻辑 GPIO 引脚标识枚举，由 AF_config/board_config.h 映射物理引脚。 */
 typedef enum
 {
-    CORE_GPIO_PIN_STATUS_LED = 0, /**< 板载运行状态指示灯引脚。 */
+    CORE_GPIO_PIN_STATUS_LED = 0, /**< 旧状态灯逻辑编号；默认未连接，WS2812由面板端口管理。 */
     CORE_GPIO_PIN_RS485_BUS1_DE,  /**< RS485 总线1收发方向控制引脚。 */
     CORE_GPIO_PIN_RS485_BUS2_DE,  /**< RS485 总线2收发方向控制引脚。 */
     CORE_GPIO_PIN_SENSOR_TRIG,    /**< 外部传感器脉冲触发输入引脚。 */

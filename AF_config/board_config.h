@@ -17,7 +17,7 @@ extern "C" {
 /** @brief 未连接或不使用硬件引脚时的哨兵值。 */
 #define BOARD_GPIO_PIN_NC (-1)
 
-/** @brief 板载状态指示灯 GPIO 编号（默认 GPIO48，按实际底板调整）。 */
+/** @brief 由面板RMT独占的板载WS2812输出引脚。 */
 #define BOARD_GPIO_STATUS_LED_PIN 48
 /** @brief ESP32-S3板载BOOT按键，低电平有效。 */
 #define BOARD_GPIO_BOOT_PIN 0
@@ -76,8 +76,6 @@ extern "C" {
 #define BOARD_TASK_BOOTSTRAP_STACK_BYTES UINT32_C(4096)
 /** @brief 默认引导监控任务优先级。 */
 #define BOARD_TASK_BOOTSTRAP_PRIORITY UINT32_C(5)
-/** @brief 默认引导监控任务周期，单位 ms。 */
-#define BOARD_TASK_BOOTSTRAP_PERIOD_MS UINT32_C(100)
 
 #ifdef __cplusplus
 }
